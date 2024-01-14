@@ -1,61 +1,75 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const bodyParser = require('body-parser');
-const User = require('../backend/db'); // Assuming the User model is defined in a separate file
-
+const express = require("express");
+const cors = require("cors");
 const app = express();
-const port = 5000;
+app.use(express.json());
+app.use(cors());
+const userModel = require("../backend1/users");
+const localStrategy = require("passport-local");
+const passport = require("passport");
+passport.use(new localStrategy(userModel.authenticate()));
 
-app.use(bodyParser.urlencoded({ extended: true }));
-app.set('view engine', 'ejs');
-
-  app.get('/', (req, res) => {
-    res.render('Login');
+// mongoose.connect("mongodb://127.0.0.1:27017/project");
+// app.post("/login",(req,res)=>
+// {
+//     const{email,password} = req.body;
+//     HotelModel.findOne({email: email})
+//     .then(user=>{
+//         if(user){
+//             if(user.password === password){
+//                 res.json("success")
+//             }else{
+//                 res.json("password is incorrect")
+//             }
+//         }else{
+//             res.json("no record exists")
+//         }
+//     })
+// })
+// app.post('/register',(req,res)=>{
+// HotelModel.create(req.body)
+// .then(Hotel=>res.json(Hotel))
+// .catch(err=>res.json(err))
+// })
+// REGISTERING USER AND LOGIN ---------------------
+app.post("/register", function (req, res) {
+  var userdata = new userModel({
+    email: req.body.email,
+    name: req.body.name,
   });
-// Handle user registration
-app.post('/register', async (req, res) => {
-  try {
-    // Create a new user based on the form data
-    const newUser = new User({
-      name: req.body.name,
-      email: req.body.email,
-      password: req.body.password
+  userModel
+    .register(userdata, req.body.password)
+    .then(function (registereduser) {
+      passport.authenticate("local")(req, res, function () {
+        res.redirect("/");
+      });
     });
-
-    // Save the user to the database
-    const savedUser = await newUser.save();
-
-    res.status(201).send('User registered successfully!');
-  } catch (error) {
-    res.status(500).send('Error registering user');
-  }
 });
-
-app.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Check if a user with the provided email exists
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(404).send('User not found');
+// LOGIN USER
+app.post(
+  "/login",
+  passport.authenticate("local", {
+    successRedirect: "/",
+    failureRedirect: "/login",
+    failureFlash: true,
+  }),
+  function (req, res) {}
+);
+// LOGOUT
+app.get("/logout", function (req, res, next) {
+  req.logout(function (err) {
+    if (err) {
+      return next(err);
     }
-
-    // Check if the provided password matches the user's password
-    if (password === user.password) {
-      // Passwords match, consider the user logged in
-      return res.status(200).send('User logged in successfully!');
-    } else {
-      // Passwords do not match
-      return res.status(401).send('Invalid password');
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Error during login');
-  }
+    res.redirect("/login");
+  });
 });
-
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+// is LOggedIN middleware
+function isLoggedIn(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  res.redirect("/");
+}
+app.listen(5000, () => {
+  console.log("server is running");
 });
